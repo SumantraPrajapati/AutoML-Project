@@ -1,0 +1,27 @@
+{
+    "LinearRegression": {
+        "Training ": 37277681.70201866,
+        "Testing": 33596915.851361446,
+        "OverfittingFactor": 1.1095566589189783
+    },
+    "Ridge": {
+        "Training ": 37281031.22157782,
+        "Testing": 33654694.59317708,
+        "OverfittingFactor": 1.1077512861797272
+    },
+    "Lasso": {
+        "Training ": 37437552.198346406,
+        "Testing": 34245315.270327955,
+        "OverfittingFactor": 1.0932167481250898
+    },
+    "RandomForest": {
+        "Training ": 3753332.4922533343,
+        "Testing": 20942520.922619622,
+        "OverfittingFactor": 5.579713751937458
+    },
+    "GradientBoosting": {
+        "Training ": 14488502.507397631,
+        "Testing": 18745176.47586223,
+        "OverfittingFactor": 1.293796682320426
+    }
+}

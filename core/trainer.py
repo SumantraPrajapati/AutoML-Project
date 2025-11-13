@@ -1,5 +1,8 @@
 import numpy as np
 import pandas as pd
+import json
+
+
 from core.tuning import HyperparameterTuner
 from configs.config_params import param_grids
 from sklearn.model_selection import train_test_split
@@ -31,7 +34,7 @@ class Train_Model:
             raise ValueError(f"Target column '{target}' not found in dataset.")
         
         if not pd.api.types.is_numeric_dtype(df[target]):
-            raise TypeError(f"❌ Target column '{target}' must be numeric, but got {df[target].dtype}.")
+            raise TypeError(f"Target column '{target}' must be numeric, but got {df[target].dtype}.")
 
         # Split data
         X = df.drop(columns=[target])
@@ -55,7 +58,7 @@ class Train_Model:
         }
 
         results = {}
-
+        overfitting_array = {}
         # --- Training loop ---
         for name, model in candidate_models.items():
             if self.tuning_enabled and name in param_grids:
@@ -67,27 +70,47 @@ class Train_Model:
                     print(f"Best Parameters  for {name} : {best_params}")
             
             model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
+            y_test_pred = model.predict(X_test)
+            y_train_pred = model.predict(X_train)
 
-            # Calculate metrics
-            mse = mean_squared_error(y_test, y_pred)
-            rmse = np.sqrt(mse)
-            mae = mean_absolute_error(y_test, y_pred)
-            r2 = r2_score(y_test, y_pred)
+            # Calculate Testing metrics
+            test_mse = mean_squared_error(y_test, y_test_pred)
+            test_rmse = np.sqrt(test_mse)
+            test_mae = mean_absolute_error(y_test, y_test_pred)
+            test_score = r2_score(y_train , y_train_pred)
 
-            metrics = {"RMSE": rmse, "MAE": mae, "R2": r2}
+            # Calculating Training metrics
+            train_mse = mean_squared_error(y_train , y_train_pred)
+            train_rmse = np.sqrt(train_mse)
+            train_mae = mean_absolute_error(y_train , y_train_pred)
+            train_score = r2_score(y_test, y_test_pred)
+
+            metrics = {"RMSE": train_rmse, "MAE": train_mae, "Training R2 Score": train_score }
+
             results[name] = metrics
 
+            overfitting_array[name] = {"Training ": train_mse , "Testing": test_mse , "OverfittingFactor":max(test_mse, train_mse) / min(test_mse, train_mse)}
             if self.verbose:
-                print(f"{name} trained → R2: {r2:.4f}, RMSE: {rmse:.4f}")
+                print(f"{name} trained → R2 for Training Data: {train_score:.4f}, RMSE: {train_rmse:.4f}")
 
-        sorted_models = sorted(results.items(), key=lambda x: x[1]["R2"], reverse=True)
+        sorted_models = sorted(results.items(), key=lambda x: x[1]["Training R2 Score"], reverse=True)
         top_models = sorted_models[:3]
 
         if self.verbose:
             print("\nTop 3 models for ensemble:")
             for name, metrics in top_models:
-                print(f"  {name} → R2: {metrics['R2']:.4f}")
+                print(f"  {name} → R2: {metrics['Training R2 Score']:.4f}")
+
+        # Overfitting_factor = abs(train_mse - test_mse)
+        # print(f"Overfitting Factor is :{Overfitting_factor}")
+       
+
+        # Save to text file
+        with open("overfitting_results.txt", "w") as f:
+            json.dump(overfitting_array, f, indent=4)
+
+        print("✅ Saved successfully to overfitting_results.txt")
+
 
         # --- Build Voting Regressor ---
         voting_estimators = [(name, candidate_models[name]) for name, _ in top_models]
@@ -107,8 +130,8 @@ class Train_Model:
             print(f"\nVoting Ensemble → R2: {r2_vote:.4f}, RMSE: {rmse_vote:.4f}")
 
         # --- Compare voting with best individual model ---
-        best_model_name = max(results, key=lambda m: results[m]["R2"])
-        if r2_vote > results[best_model_name]["R2"]:
+        best_model_name = max(results, key=lambda m: results[m]["Training R2 Score"])
+        if r2_vote > results[best_model_name]["Training R2 Score"]:
             self.best_model = voting_regressor
             self.best_metrics = voting_metrics
             best_model_name = "VotingEnsemble"
@@ -119,6 +142,11 @@ class Train_Model:
         if self.verbose:
             print(f"\nBest Overall Model → {best_model_name}")
             print("Metrics:", self.best_metrics)
+
+        
+        # Building Bagging Regressor
+
+       
 
         return self.best_model, self.best_metrics
 
